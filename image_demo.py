@@ -51,13 +51,7 @@ def video_clip(im_file):
 def pw_detect(im_file, new_file, threshold=None):
     if threshold is not float:
         threshold = 0.2
-    #print(f"Threshold: {threshold}")
 
-    #file_path = im_file.replace("\\","/")
-    #print(f"File path: {im_file}")
-    #im_file_path = im_file.replace("\\","/")
-    #new_file_path = new_file_path.replace("\\","/")
-    #print(f"New file path: {new_file}")
     #%% 
     # Setting the device to use for computations ('cuda' indicates GPU)
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -101,24 +95,9 @@ def pw_detect(im_file, new_file, threshold=None):
             result['object'] = 1
             shutil.copy(im_file, new_file_path)
             return result
-        """    img = Image.open(im_file)
-                   exif_data = img._getexif()
-            date, time = exif_data[36867].split(' ')
-            result["Date"] = date
-            result["Time"] = time
-            result["Make"] = exif_data[271]"""
+
     
     result['object'] = 0
     return result
         
-            
 
-    #%% Output to cropped images
-    # Saving the detected objects as cropped images
-    #pw_utils.save_crop_images(results, "crop_output")
-
-    #%% Output to JSON results
-    # Saving the detection results in JSON format
-    """output_folder = session_root + "_out"
-    pw_utils.save_detection_json(results, output_folder,
-                                categories=detection_model.CLASS_NAMES)"""
