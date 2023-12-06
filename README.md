@@ -1,4 +1,5 @@
-# MDetToolsForJCameraTraps
+# VideoExtractWin
+
 
 ## What's this：このプログラムについて
 
@@ -21,9 +22,8 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
     以下のコードはWindows 10 Proで動作確認しています。  
     動作確認時、動画ファイル形式は.mp4を用いました。
 
-現段階ではGPU使用不可、一応記載
 
-* NVIDIA Driver(if use gpu)
+* NVIDIA Driver
     NVIDAドライバーをインストールする
 
     Please refer to [NVIDIA Driver Version Check](https://www.nvidia.com/Download/index.aspx?lang=en-us).
@@ -75,27 +75,26 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
     conda env create -f environment.yml
     conda activate pwlife
     ```
-4. gpuを使う場合、以下のサイトを見てバージョンを合わせたものをインストールする
-    CUDA Toolkit 12.3 Downloads
+4. 以下のサイトを見てバージョンを合わせたものをインストールする
+    CUDA Toolkit 11.3 Downloads
     https://developer.nvidia.com/cuda-downloads 
 
     cudnnのインストール(ログインが必要)
     https://developer.nvidia.com/rdp/cudnn-download
 
-    (必要なら)
-    https://pytorch.org/ 
-    例　conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
   
 5. PytorchWildlifeのインストール
     Install through pip:
     ```commandprompt
     pip install PytorchWildlife
     ```
-6. コードの改変
-    post_process.pyの３４行目
-        with sv.ImageSink(target_dir_path=output_dir, overwrite=True) as sink:
-    =>
-        with sv.ImageSink(target_dir_path=output_dir, overwrite=False) as sink:
+6.　バージョン管理
+    ```commandprompt
+    pip uninstall torch
+    conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoolkit=11.3 -c pytorch -c conda-forge
+    pip uninstall -y charset_normalizer
+    pip install charset_normalizer==2.0.0
+    ```
 <br />
 
 
@@ -119,7 +118,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
     ```
 
 
-2. gpuが使えるか確認(現在不必要)
+2. gpuが使えるか確認
 
     ```commandprompt(conda)
     python gpu_check.py
