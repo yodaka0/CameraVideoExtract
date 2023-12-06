@@ -61,10 +61,13 @@ def pw_detect(im_file, new_file, threshold=None):
     #%% 
     # Setting the device to use for computations ('cuda' indicates GPU)
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Using {} for computations".format(DEVICE))
 
     #%% 
     # Initializing the MegaDetectorV5 model for image detection
     detection_model = pw_detection.MegaDetectorV5(device=DEVICE, pretrained=True)
+    transform = pw_trans.MegaDetector_v5_Transform(target_size=detection_model.IMAGE_SIZE,
+                                                    stride=detection_model.STRIDE)
     #print("Model loaded")
 
     frames = video_clip(im_file)
@@ -78,8 +81,7 @@ def pw_detect(im_file, new_file, threshold=None):
         #img.save(new_file)
 
         # Initializing the Yolo-specific transform for the image
-        transform = pw_trans.MegaDetector_v5_Transform(target_size=detection_model.IMAGE_SIZE,
-                                                    stride=detection_model.STRIDE)
+
 
         #filename = os.path.basename(new_file)
         new_file_base = "\\" + os.path.basename(new_file) 
@@ -94,6 +96,7 @@ def pw_detect(im_file, new_file, threshold=None):
         # Saving the detection results 
         #print(results['labels'])
         if contains_animal(result['labels']):
+            print("{} : Animal detected".format(im_file))
             #pw_utils.save_detection_images(result, new_file_path)
             result['object'] = 1
             shutil.copy(im_file, new_file_path)
