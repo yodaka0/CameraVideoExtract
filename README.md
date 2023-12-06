@@ -2,8 +2,8 @@
 
 ## What's this：このプログラムについて
 
-This program aims to detect wildlife from camera trap images using [MegaDetector (Beery et al. 2019)](https://github.com/microsoft/CameraTraps) and to extract images in which animals were detected. This document is a minimal description and will be updated as needed.  
-このプログラムは、[MegaDetector (Beery et al. 2019)](https://github.com/microsoft/CameraTraps)を利用してカメラトラップ映像から野生動物を検出し、動物が検出された画像を抽出することを目的として作成されました。このドキュメントは現時点では最低限の記述しかされていないため、今後随時更新していく予定です。
+This program aims to detect wildlife from camera trap images using [MegaDetector (Beery et al. 2019)](https://github.com/microsoft/CameraTraps) and to extract videos in which animals were detected. This document is a minimal description and will be updated as needed.  
+このプログラムは、[MegaDetector (Beery et al. 2019)](https://github.com/microsoft/CameraTraps)を利用してカメラトラップ映像から野生動物を検出し、動物が検出された動画を抽出することを目的として作成されました。このドキュメントは現時点では最低限の記述しかされていないため、今後随時更新していく予定です。
 
  
 
@@ -19,7 +19,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
     The following code was tested on Windows 10 Pro.  
     During the test run, .jpg as the image file format.  
     以下のコードはWindows 10 Proで動作確認しています。  
-    動作確認時、静止画ファイル形式は.jpgを用いました。
+    動作確認時、動画ファイル形式は.mp4を用いました。
 
 現段階ではGPU使用不可、一応記載
 
@@ -66,7 +66,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
 2. Move Project Directory：プロジェクトディレクトリへ移動
 
     ```commandprompt
-    cd {ImageExtractWinのパス}
+    cd {VideExtractWinのパス}
     ```
 
 3. create conda environment：conda環境の構築
@@ -109,7 +109,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
 0. ディレクトリの移動
 
     ```commandprompt
-    cd {ImageExtractWinのパス}
+    cd {VideoExtractWinのパス}
     ```
     
 1. conda環境のアクティベート
