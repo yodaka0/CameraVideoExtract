@@ -85,6 +85,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
   
 5. PytorchWildlifeのインストール
     Install through pip:
+   
     ```commandprompt
     pip install PytorchWildlife
     ```
@@ -93,9 +94,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
 
     pip uninstall torch
     
-    conda install pytorch==1.10.1 
-    torchvision==0.11.2 torchaudio==0.10.1 
-    cudatoolkit=11.3 -c pytorch -c conda-forge
+    conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoolkit=11.3 -c pytorch -c conda-forge
     
     pip uninstall -y charset_normalizer
     
