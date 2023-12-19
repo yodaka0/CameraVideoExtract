@@ -77,7 +77,7 @@ This program aims to detect wildlife from camera trap images using [MegaDetector
     ```
 4. 以下のサイトを見てバージョンを合わせたものをインストールする
     CUDA Toolkit 11.3 Downloads
-    https://developer.nvidia.com/cuda-downloads 
+    https://developer.nvidia.com/cuda-11.3.0-download-archive
 
     cudnnのインストール(ログインが必要)
     https://developer.nvidia.com/rdp/cudnn-download
