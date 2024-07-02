@@ -49,7 +49,7 @@ def video_clip(im_file):
     return frames
 
 def pw_detect(im_file, new_file, threshold=None):
-    if threshold is not float:
+    if not isinstance(threshold, float):
         threshold = 0.2
 
     #%% 
