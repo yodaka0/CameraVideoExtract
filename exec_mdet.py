@@ -3,13 +3,17 @@ import sys
 import time
 import humanfriendly
 import pandas as pd
+import numpy as np
 from omegaconf import OmegaConf
 from multiprocessing import Process
 import multiprocessing
 from threading import Thread
+from natsort import natsorted
 
 from image_demo import pw_detect
-#import visualization.visualization_utils as viz_utils
+import visualization.visualization_utils as viz_utils
+from PytorchWildlife import utils as pw_utils
+from supervision.detection.core import Detections
 
 
 
@@ -28,43 +32,98 @@ def find_video_files(folder_path):
             if any(file.lower().endswith(ext) for ext in video_extensions):
                 video_files.append(os.path.join(root, file))
 
+    video_files = natsorted(video_files)
+
     return video_files
 
+
+def save_detection_results(results, session_root, size, done=False):
+    """
+    Save detection results in JSON and CSV formats, and print the status of the output.
+
+    :param results: The detection results to be saved.
+    :param session_root: The root path for the session.
+    """
+    output_dir = session_root + "_out"
+    output_json_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".json")
+    output_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".csv")
+    
+    # Save detection results in JSON format
+    pw_utils.save_detection_json(
+        results, 
+        output_json_path,
+        categories={
+            0: "animal",
+            1: "person",
+            2: "vehicle"
+        },
+        exclude_category_ids=[],  # Category IDs can be found in the definition of each model.
+        exclude_file_path=None
+    )
+    print('Output JSON file saved at {}'.format(output_json_path))
+    sys.stdout.flush()  # Ensure the print statement is immediately output
+
+    # Convert results to DataFrame
+    results_dataframe = pd.DataFrame(results)
+    results_dataframe_object = results_dataframe[results_dataframe['object'] > 0]
+
+    # Save results DataFrame to CSV
+    results_dataframe_object.to_csv(output_csv_path, index=True)
+    print('Output CSV file saved at {}'.format(output_csv_path))
+    sys.stdout.flush()  # Ensure the print statement is immediately output
+
+    # Check for and save corrupt results
+    
+    if done:
+        results_dataframe_corrupt = results_dataframe[results_dataframe['object'] < 0]
+        if len(results_dataframe_corrupt) > 0:
+            for corrupt in results_dataframe_corrupt['file']:
+                print('{} was corrupted'.format(corrupt))
+            output_corrupt_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_corrupt.csv")
+            results_dataframe_corrupt.to_csv(output_corrupt_csv_path, index=True)
+            sys.stdout.flush()  # Ensure the print statement is immediately output
+
+
 def process_image(im_file,session_root,threshold):
-    #session_root = session_root.replace("\\\\","\\")
-    #print(session_root)
-    #try:
-    folder = os.path.dirname(session_root)
-    folderpath = folder + "\\"
-    new_folder = im_file.replace(folderpath,"")
-    ex_file =os.path.basename(new_folder)
-    new_file = os.path.join(folder,new_folder.replace("\\","_out\\"))
 
+    skip = False
 
-    if os.path.exists(new_file):
-        print(f"{new_file} exists")
-        object = 1
-        result = {
+    det_null = Detections(xyxy=np.empty((0, 4), dtype=np.float32), mask=None, 
+                        confidence=np.array([], dtype=np.float32), class_id=np.array([], dtype=np.int32), tracker_id=None)
+    try:
+        folder = os.path.dirname(session_root)
+        folderpath = folder + "\\"
+        new_folder = im_file.replace(folderpath,"")
+        #ex_file = os.path.basename(new_folder)
+        new_file = os.path.join(folder,new_folder.replace("\\","_out\\"))
+        
+        if os.path.exists(new_file) and skip:
+            print(f"{new_file} exists")
+            results = {
+                'img_id': im_file,
+                'detections': det_null,
+                'labels': 'animal',
+                'object': 1,
+                'eventStart': 0,
+                'eventEnd': 0,
+                'Make': None,
+            }
+        else:
+            results = pw_detect(im_file, new_file, threshold)
+        #result['deploymentID'] = os.path.basename(session_root)
+        #result['file'] = ex_file
+        return results
+    
+    except Exception as e:
+        print('Video {} cannot be processed. Exception: {}'.format(im_file, e))
+        results = {
             'img_id': im_file,
-            'detections': 'exists',
-            'labels': 'animal',
-            'object': object,
-            'file': ex_file,
+            'detections': det_null,
+            'file': os.path.basename(im_file),
+            'object': -1
         }
-    else:
-        result = pw_detect(im_file, new_file, threshold)
-        result['file'] = ex_file
-        return result
+        return results
 
-    """except Exception as e:
-        #if not quiet:
-        print('Image {} cannot be processed. Exception: {}'.format(im_file, e))
-        result = {
-            'file': im_file,
-            'failure': "FAILURE_INFER",
-            'object': -1,
-        }
-        return result"""
 
 def producer_func(q,image_files):
     """
@@ -83,7 +142,7 @@ def producer_func(q,image_files):
                 print('Loading image {}'.format(im_file)); sys.stdout.flush()
             #image = viz_utils.load_image(im_file)
         except Exception as e:
-            print('Producer process: image {} cannot be loaded. Exception: {}'.format(im_file, e))
+            print('Producer process: Video {} cannot be loaded. Exception: {}'.format(im_file, e))
             #raise
 
         if verbose:
@@ -95,7 +154,7 @@ def producer_func(q,image_files):
     print('Finished image loading'); sys.stdout.flush()
 
 
-def consumer_func(q,return_queue,session_root=None,threshold=None):
+def consumer_func(q, return_queue, session_root=None, threshold=None, checkpoint=None):
     """
     Consumer function; only used when using the (optional) image queue.
 
@@ -107,12 +166,11 @@ def consumer_func(q,return_queue,session_root=None,threshold=None):
 
     start_time = time.time()
     print(start_time)
-    #detector = load_detector(model_file)
     elapsed = time.time() - start_time
     print('Loaded model (before queueing) in {}'.format(humanfriendly.format_timespan(elapsed)))
     sys.stdout.flush()
 
-    results = []
+    results_list = []
 
     n_images_processed = 0
 
@@ -120,8 +178,8 @@ def consumer_func(q,return_queue,session_root=None,threshold=None):
         r = q.get()
         if r is None:
             q.task_done()
-            return_queue.put(results)
-            #print("r is none")
+            #save_detection_results(results, session_root, size = len(results), done=True)
+            return_queue.put(results_list)
             return
         n_images_processed += 1
         im_file = r[0]
@@ -129,20 +187,18 @@ def consumer_func(q,return_queue,session_root=None,threshold=None):
         if verbose or ((n_images_processed % 10) == 0):
             elapsed = time.time() - start_time
             images_per_second = n_images_processed / elapsed
-            print('De-queued image {} ({}/s) ({})'.format(n_images_processed,
-                                                          images_per_second,
-                                                          im_file));
+            print('De-queued image {} ({}/s) ({})'.format(n_images_processed,images_per_second,im_file))
             sys.stdout.flush()
-        result = process_image(im_file,session_root,threshold)
-        results.append(result)
+        """if checkpoint is not None and checkpoint > 0 and ((n_images_processed % checkpoint) == 0):
+                 save_detection_results(results, session_root, size=n_images_processed, done=False)"""
+        results = process_image(im_file,session_root,threshold)
+        results_list.append(results)
         if verbose:
-            print('Processed image {}'.format(im_file)); sys.stdout.flush()
+            print('Processed video {}'.format(im_file)); sys.stdout.flush()
         q.task_done()
     
-    
 
-def run_detector_with_image_queue(image_files, threshold, session_root,
-                                  quiet=False):
+def run_detector_with_image_queue(image_files, threshold, session_root, checkpoint):
     """
     Driver function for the (optional) multiprocessing-based image queue; only used when --use_image_queue
     is specified.  Starts a reader process to read images from disk, but processes images in the
@@ -174,15 +230,13 @@ def run_detector_with_image_queue(image_files, threshold, session_root,
 
         if run_separate_consumer_process:
             if use_threads_for_queue:
-                consumer = Thread(target=consumer_func,args=(q,return_queue, session_root,
-                                                            threshold))
+                consumer = Thread(target=consumer_func,args=(q,return_queue, session_root, threshold, checkpoint))
             else:
-                consumer = Process(target=consumer_func,args=(q,return_queue, session_root,
-                                                            threshold))
+                consumer = Process(target=consumer_func,args=(q,return_queue, session_root, threshold, checkpoint))
             consumer.daemon = True
             consumer.start()
         else:
-            consumer_func(q,return_queue,session_root,threshold)
+            consumer_func(q, return_queue, session_root, threshold, checkpoint)
 
         producer.join()
         print('Producer finished')
@@ -195,28 +249,18 @@ def run_detector_with_image_queue(image_files, threshold, session_root,
 
         q.join()
         print('Queue joined')
-
-        
-
+            
         if not return_queue.empty():
-            results = return_queue.get()
-
-            #print(results)
-            results_dataframe = pd.DataFrame(results)
-            results_dataframe_corrupt = results_dataframe[results_dataframe['object'] < 0]
-            results_dataframe_object = results_dataframe[results_dataframe['object'] > 0]
-            results_dataframe_object.to_csv(session_root + "_out\\" + os.path.basename(session_root) + "_output.csv", index=True)
-            print('Output csv file saved at detector_output.csv')
-            if len(results_dataframe_corrupt) > 0:
-                for corrupt in results_dataframe_corrupt['file'] :
-                    print('{} was corrupted'.format(corrupt))
-                results_dataframe_corrupt.to_csv(session_root+ "_out\\" + os.path.basename(session_root) + "_corrupt.csv", index=True)
-
-            return results
+            results_list = return_queue.get()
+            print('Results returned from queue')
+            #last results print
+            print(results_list[-1])
+            return results_list
         
         else:
             print('Warning: no results returned from queue')
             return []
+        
     except Exception as e:
         print('Exception: {}'.format(e))
         raise
@@ -228,6 +272,8 @@ session_root = cli_conf.get("session_root").rstrip("\\")
 
 threshold = cli_conf.get("threshold")
 
+checkpoint = cli_conf.get("checkpoint")
+
 parent_dir = os.path.dirname(session_root) + "\\"
 create_new_structure(session_root, parent_dir)
 image_files = find_video_files(session_root)
@@ -237,6 +283,9 @@ max_queue_size = 10
 use_threads_for_queue = True
 verbose = False
 
-run_detector_with_image_queue(image_files, threshold=threshold, session_root=session_root, quiet=False)
+if isinstance(checkpoint, str) and checkpoint[0] == "r":
+    checkpoint = len(image_files) // int(checkpoint[1:])
+print(checkpoint)
 
 
+run_detector_with_image_queue(image_files, threshold, session_root, checkpoint)
