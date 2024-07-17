@@ -17,17 +17,19 @@ import torch
 #%% 
 # Importing the model, dataset, transformations and utility functions from PytorchWildlife
 from PytorchWildlife.models import detection as pw_detection
-from PytorchWildlife.data import transforms as pw_trans
-#from PytorchWildlife.data import datasets as pw_data 
-#from PytorchWildlife import utils as pw_utils
 
-def contains_animal(labels):
-    for label in labels:
-        if 'animal' in label:
-            return True
-    return False
 
 def video_clip(im_file):
+    cliped_frames_path = None
+    # make a directory to store the frames
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv']
+    for ext in video_extensions:
+        if im_file.lower().endswith(ext):
+            ext_start_index = im_file.lower().rfind(ext.lower())
+            cliped_frames_path = im_file[:ext_start_index] + im_file[ext_start_index+len(ext):]
+    #print(cliped_frames_path)
+    if not os.path.exists(cliped_frames_path):
+        os.makedirs(cliped_frames_path)
     # Open the video file
     vidcap = cv2.VideoCapture(im_file)
 
@@ -41,12 +43,14 @@ def video_clip(im_file):
         # Save frame as image every second
         if count % fps == 0:
             frames.append(image)
+            # Save the frame as an image
+            cv2.imwrite(cliped_frames_path + "\\frame%d.jpg" % count, image)
         
         # Read the next frame
         success, image = vidcap.read()
         count += 1
     
-    return frames
+    return cliped_frames_path, count
 
 def pw_detect(im_file, new_file, threshold=None):
     if not isinstance(threshold, float):
@@ -55,49 +59,27 @@ def pw_detect(im_file, new_file, threshold=None):
     #%% 
     # Setting the device to use for computations ('cuda' indicates GPU)
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Using {} for computations".format(DEVICE))
 
     #%% 
-    # Initializing the MegaDetectorV5 model for image detection
-    detection_model = pw_detection.MegaDetectorV5(device=DEVICE, pretrained=True)
-    transform = pw_trans.MegaDetector_v5_Transform(target_size=detection_model.IMAGE_SIZE,
-                                                    stride=detection_model.STRIDE)
-    #print("Model loaded")
+    # Initializing the MegaDetectorV6 model for image detection
+    detection_model = pw_detection.MegaDetectorV6(device=DEVICE, weights='../MDV6b-yolov9c.pt', pretrained=False)
 
-    frames = video_clip(im_file)
+    cliped_frames_path, count = video_clip(im_file)
 
     #%% Single image detection
-    # Specifying the path to the target image TODO: Allow argparsing
+    #object = list()
 
-    # Opening and converting the image to RGB format
-    for frame in frames:
-        img = np.array(Image.fromarray(frame).convert("RGB"))
-        #img.save(new_file)
+    results = detection_model.batch_image_detection(cliped_frames_path, batch_size=count, conf_thres=threshold)
 
-        # Initializing the Yolo-specific transform for the image
-
-
-        #filename = os.path.basename(new_file)
-        new_file_base = "\\" + os.path.basename(new_file) 
-        new_file_path = new_file.replace(new_file_base,"")
-        
-
-        # Performing the detection on the single image
-        result = detection_model.single_image_detection(transform(img), img.shape, im_file, conf_thres=threshold)
-        
-        result['img_id'] = result['img_id'].replace("\\","/")
-
-        # Saving the detection results 
-        #print(results['labels'])
-        if contains_animal(result['labels']):
-            print("{} : Animal detected".format(im_file))
-            #pw_utils.save_detection_images(result, new_file_path)
-            result['object'] = 1
-            shutil.copy(im_file, new_file_path)
-            return result
+    animal_ns = []
+    for result in results:
+        animal_ns.append(sum('animal' in item for item in result['labels']))
+        print(animal_ns[-1])
+        if animal_ns[-1] > 0:
+            print('Animal detected')
+            # copy the video to the new file
+            shutil.copy(im_file, new_file)
+    
+    return results
 
     
-    result['object'] = 0
-    return result
-        
-
