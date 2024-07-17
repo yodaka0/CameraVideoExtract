@@ -72,14 +72,21 @@ def pw_detect(im_file, new_file, threshold=None):
     results = detection_model.batch_image_detection(cliped_frames_path, batch_size=count, conf_thres=threshold)
 
     animal_ns = []
+    first = True
     for result in results:
         animal_ns.append(sum('animal' in item for item in result['labels']))
-        print(animal_ns[-1])
+        #save first result
+        if first:
+            first = False
+            result_first = result
+        #print(animal_ns[-1])
         if animal_ns[-1] > 0:
-            print('Animal detected')
+            #print('Animal detected')
             # copy the video to the new file
             shutil.copy(im_file, new_file)
+
+    result_first['animal_ns'] = animal_ns
     
-    return results
+    return result_first
 
     
