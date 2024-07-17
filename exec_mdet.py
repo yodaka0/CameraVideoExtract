@@ -36,6 +36,12 @@ def find_video_files(folder_path):
 
     return video_files
 
+def contains_natural_number(lst,rev=False):
+    if rev:
+        return any(isinstance(item, int) and item < 0 for item in lst)
+    else:
+        return any(isinstance(item, int) and item > 0 for item in lst)
+
 
 def save_detection_results(results, session_root, size, done=False):
     """
@@ -45,10 +51,10 @@ def save_detection_results(results, session_root, size, done=False):
     :param session_root: The root path for the session.
     """
     output_dir = session_root + "_out"
-    output_json_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".json")
+    #output_json_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".json")
     output_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".csv")
     
-    # Save detection results in JSON format
+    """# Save detection results in JSON format
     pw_utils.save_detection_json(
         results, 
         output_json_path,
@@ -61,27 +67,27 @@ def save_detection_results(results, session_root, size, done=False):
         exclude_file_path=None
     )
     print('Output JSON file saved at {}'.format(output_json_path))
-    sys.stdout.flush()  # Ensure the print statement is immediately output
+    sys.stdout.flush()  # Ensure the print statement is immediately output"""
 
     # Convert results to DataFrame
     results_dataframe = pd.DataFrame(results)
-    results_dataframe_object = results_dataframe[results_dataframe['object'] > 0]
-
+    #if list 'animal_ns' contains natural values, its row will be extracted
+    filtered_dataframe = results_dataframe[results_dataframe['animal_ns'].apply(contains_natural_number)]
     # Save results DataFrame to CSV
-    results_dataframe_object.to_csv(output_csv_path, index=True)
+    filtered_dataframe.to_csv(output_csv_path, index=True)
     print('Output CSV file saved at {}'.format(output_csv_path))
     sys.stdout.flush()  # Ensure the print statement is immediately output
 
     # Check for and save corrupt results
     
     if done:
-        results_dataframe_corrupt = results_dataframe[results_dataframe['object'] < 0]
+        results_dataframe_corrupt = results_dataframe[results_dataframe['animal_ns'].apply(contains_natural_number, rev=True)]
         if len(results_dataframe_corrupt) > 0:
             for corrupt in results_dataframe_corrupt['file']:
                 print('{} was corrupted'.format(corrupt))
             output_corrupt_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_corrupt.csv")
             results_dataframe_corrupt.to_csv(output_corrupt_csv_path, index=True)
-            sys.stdout.flush()  # Ensure the print statement is immediately output
+            sys.stdout.flush() 
 
 
 def process_image(im_file,session_root,threshold):
@@ -178,7 +184,7 @@ def consumer_func(q, return_queue, session_root=None, threshold=None, checkpoint
         r = q.get()
         if r is None:
             q.task_done()
-            #save_detection_results(results, session_root, size = len(results), done=True)
+            save_detection_results(results_list, session_root, size = len(results_list), done=True)
             return_queue.put(results_list)
             return
         n_images_processed += 1
@@ -189,10 +195,10 @@ def consumer_func(q, return_queue, session_root=None, threshold=None, checkpoint
             images_per_second = n_images_processed / elapsed
             print('De-queued image {} ({}/s) ({})'.format(n_images_processed,images_per_second,im_file))
             sys.stdout.flush()
-        """if checkpoint is not None and checkpoint > 0 and ((n_images_processed % checkpoint) == 0):
-                 save_detection_results(results, session_root, size=n_images_processed, done=False)"""
-        results = process_image(im_file,session_root,threshold)
-        results_list.append(results)
+        if checkpoint is not None and checkpoint > 0 and ((n_images_processed % checkpoint) == 0):
+                 save_detection_results(results_list, session_root, size=n_images_processed, done=False)
+        result = process_image(im_file,session_root,threshold)
+        results_list.append(result)
         if verbose:
             print('Processed video {}'.format(im_file)); sys.stdout.flush()
         q.task_done()
@@ -285,7 +291,7 @@ verbose = False
 
 if isinstance(checkpoint, str) and checkpoint[0] == "r":
     checkpoint = len(image_files) // int(checkpoint[1:])
-print(checkpoint)
+print("checkpoint:",checkpoint)
 
 
 run_detector_with_image_queue(image_files, threshold, session_root, checkpoint)
