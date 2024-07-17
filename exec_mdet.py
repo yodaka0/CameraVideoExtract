@@ -126,7 +126,7 @@ def process_image(im_file,session_root,threshold):
             'img_id': im_file,
             'detections': det_null,
             'file': os.path.basename(im_file),
-            'object': -1
+            'animal_ns': -1
         }
         return results
 
