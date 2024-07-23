@@ -52,7 +52,7 @@ def video_clip(im_file):
     
     return cliped_frames_path, count
 
-def pw_detect(im_file, new_file, threshold=None):
+def pw_detect(im_file, new_file, threshold=None, dir_remove=True):
     if not isinstance(threshold, float):
         threshold = 0.2
 
@@ -86,6 +86,10 @@ def pw_detect(im_file, new_file, threshold=None):
             shutil.copy(im_file, new_file)
 
     result_first['animal_ns'] = animal_ns
+
+    #delete directory of cliped_frames_path
+    if dir_remove:
+        shutil.rmtree(cliped_frames_path)
     
     return result_first
 
