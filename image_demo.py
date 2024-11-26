@@ -62,7 +62,7 @@ def pw_detect(im_file, new_file, threshold=None, dir_remove=True):
 
     #%% 
     # Initializing the MegaDetectorV6 model for image detection
-    detection_model = pw_detection.MegaDetectorV6(device=DEVICE, weights='../MDV6b-yolov9c.pt', pretrained=False)
+    detection_model = pw_detection.MegaDetectorV6(device=DEVICE, pretrained=True, version="yolov9c")
 
     cliped_frames_path, count = video_clip(im_file)
 
