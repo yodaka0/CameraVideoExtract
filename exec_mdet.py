@@ -20,7 +20,8 @@ from supervision.detection.core import Detections
 def create_new_structure(src_dir, dst_dir):
     for dir, _ ,_ in os.walk(src_dir):
         dirs_name = dir.replace(dst_dir, "")
-        new_dir = dst_dir + "\\" + dirs_name.replace("\\", "_out\\") + "_out"
+        new_dir = os.path.join(dst_dir, dirs_name.replace(os.path.sep, "_out" + os.path.sep) + "_out")
+        new_dir = os.path.normpath(new_dir)
         os.makedirs(new_dir, exist_ok=True)
 
 def find_video_files(folder_path):
@@ -97,11 +98,11 @@ def process_image(im_file,session_root,threshold):
     det_null = Detections(xyxy=np.empty((0, 4), dtype=np.float32), mask=None, 
                         confidence=np.array([], dtype=np.float32), class_id=np.array([], dtype=np.int32), tracker_id=None)
     try:
-        folder = os.path.dirname(session_root)
-        folderpath = folder + "\\"
-        new_folder = im_file.replace(folderpath,"")
-        #ex_file = os.path.basename(new_folder)
-        new_file = os.path.join(folder,new_folder.replace("\\","_out\\"))
+        folder = os.path.dirname(self.session_root)
+        folderpath = folder + os.path.sep
+        new_folder = im_file.replace(folderpath, "")
+        ex_file = os.path.basename(new_folder)
+        new_file = os.path.join(folder, new_folder.replace(os.path.sep, "_out" + os.path.sep))
         
         if os.path.exists(new_file) and skip:
             print(f"{new_file} exists")
@@ -280,7 +281,7 @@ threshold = cli_conf.get("threshold")
 
 checkpoint = cli_conf.get("checkpoint")
 
-parent_dir = os.path.dirname(session_root) + "\\"
+parent_dir = os.path.dirname(session_root)
 create_new_structure(session_root, parent_dir)
 image_files = find_video_files(session_root)
 
