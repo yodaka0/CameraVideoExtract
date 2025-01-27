@@ -1,298 +1,207 @@
 import os
 import sys
 import time
-import humanfriendly
 import pandas as pd
 import numpy as np
-from omegaconf import OmegaConf
-from multiprocessing import Process
 import multiprocessing
-from threading import Thread
-from natsort import natsorted
 
 from image_demo import pw_detect
-import visualization.visualization_utils as viz_utils
 from PytorchWildlife import utils as pw_utils
 from supervision.detection.core import Detections
 
+class ExecMdet:
+    def __init__(self, image_files, threshold, session_root, checkpoint, diff_reasoning, skip, md_model):
+        self.image_files = image_files
+        self.threshold = threshold
+        self.session_root = session_root
+        self.checkpoint = checkpoint
+        self.diff_reasoning = diff_reasoning
+        self.skip = skip
+        self.verbose = False
+        self.model = md_model
 
 
-def create_new_structure(src_dir, dst_dir):
-    for dir, _ ,_ in os.walk(src_dir):
-        dirs_name = dir.replace(dst_dir, "")
-        new_dir = os.path.join(dst_dir, dirs_name.replace(os.path.sep, "_out" + os.path.sep) + "_out")
-        new_dir = os.path.normpath(new_dir)
-        os.makedirs(new_dir, exist_ok=True)
+    def save_detection_results(self, results, size, done=False):
+        """
+        Save detection results in JSON and CSV formats, and print the status of the output.
 
-def find_video_files(folder_path):
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv']
-    video_files = []
-
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if any(file.lower().endswith(ext) for ext in video_extensions):
-                video_files.append(os.path.join(root, file))
-
-    video_files = natsorted(video_files)
-
-    return video_files
-
-def contains_natural_number(lst,rev=False):
-    if rev:
-        return any(isinstance(item, int) and item < 0 for item in lst)
-    else:
-        return any(isinstance(item, int) and item > 0 for item in lst)
-
-
-def save_detection_results(results, session_root, size, done=False):
-    """
-    Save detection results in JSON and CSV formats, and print the status of the output.
-
-    :param results: The detection results to be saved.
-    :param session_root: The root path for the session.
-    """
-    output_dir = session_root + "_out"
-    #output_json_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".json")
-    output_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_output" + str(size) + ".csv")
-    
-    """# Save detection results in JSON format
-    pw_utils.save_detection_json(
-        results, 
-        output_json_path,
-        categories={
-            0: "animal",
-            1: "person",
-            2: "vehicle"
-        },
-        exclude_category_ids=[],  # Category IDs can be found in the definition of each model.
-        exclude_file_path=None
-    )
-    print('Output JSON file saved at {}'.format(output_json_path))
-    sys.stdout.flush()  # Ensure the print statement is immediately output"""
-
-    # Convert results to DataFrame
-    results_dataframe = pd.DataFrame(results)
-    #if list 'animal_ns' contains natural values, its row will be extracted
-    filtered_dataframe = results_dataframe[results_dataframe['animal_ns'].apply(contains_natural_number)]
-    # Save results DataFrame to CSV
-    filtered_dataframe.to_csv(output_csv_path, index=True)
-    print('Output CSV file saved at {}'.format(output_csv_path))
-    sys.stdout.flush()  # Ensure the print statement is immediately output
-
-    # Check for and save corrupt results
-    
-    if done:
-        results_dataframe_corrupt = results_dataframe[results_dataframe['animal_ns'].apply(contains_natural_number, rev=True)]
-        if len(results_dataframe_corrupt) > 0:
-            for corrupt in results_dataframe_corrupt['file']:
-                print('{} was corrupted'.format(corrupt))
-            output_corrupt_csv_path = os.path.join(output_dir, os.path.basename(session_root) + "_corrupt.csv")
-            results_dataframe_corrupt.to_csv(output_corrupt_csv_path, index=True)
-            sys.stdout.flush() 
-
-
-def process_image(im_file,session_root,threshold):
-
-    skip = False
-
-    det_null = Detections(xyxy=np.empty((0, 4), dtype=np.float32), mask=None, 
-                        confidence=np.array([], dtype=np.float32), class_id=np.array([], dtype=np.int32), tracker_id=None)
-    try:
-        folder = os.path.dirname(self.session_root)
-        folderpath = folder + os.path.sep
-        new_folder = im_file.replace(folderpath, "")
-        ex_file = os.path.basename(new_folder)
-        new_file = os.path.join(folder, new_folder.replace(os.path.sep, "_out" + os.path.sep))
+        :param results: The detection results to be saved.
+        :param session_root: The root path for the session.
+        """
+        output_dir = self.session_root + "_out"
+        output_json_path = os.path.join(output_dir, os.path.basename(self.session_root) + "_output" + str(size) + ".json")
+        output_csv_path = os.path.join(output_dir, os.path.basename(self.session_root) + "_output" + str(size) + ".csv")
         
-        if os.path.exists(new_file) and skip:
-            print(f"{new_file} exists")
-            results = {
+        # Save detection results in JSON format
+        pw_utils.save_detection_json(
+            results, 
+            output_json_path,
+            categories={
+                0: "animal",
+                1: "person",
+                2: "vehicle",
+                3: "false_positive",
+            },
+            exclude_category_ids=[],  # Category IDs can be found in the definition of each model.
+            exclude_file_path=None
+        )
+        print('Output JSON file saved at {}'.format(output_json_path))
+        sys.stdout.flush()  # Ensure the print statement is immediately output
+
+        # Convert results to DataFrame
+        results_dataframe = pd.DataFrame(results)
+        results_dataframe_object = results_dataframe[max[results_dataframe['animal_ns']] > 0]
+
+        # Save results DataFrame to CSV
+        results_dataframe_object.to_csv(output_csv_path, index=True)
+        print('Output CSV file saved at {}'.format(output_csv_path))
+        sys.stdout.flush()  # Ensure the print statement is immediately output
+
+        # Check for and save corrupt results
+        
+        if done:
+            results_dataframe_corrupt = results_dataframe[results_dataframe['object'] < 0]
+            if len(results_dataframe_corrupt) > 0:
+                for corrupt in results_dataframe_corrupt['file']:
+                    print('{} was corrupted'.format(corrupt))
+                output_corrupt_csv_path = os.path.join(output_dir, os.path.basename(self.session_root) + "_corrupt.csv")
+                results_dataframe_corrupt.to_csv(output_corrupt_csv_path, index=True)
+                sys.stdout.flush()  # Ensure the print statement is immediately output
+
+
+    def process_image(self, im_file, prev_result):
+
+        det_null = Detections(xyxy=np.empty((0, 4), dtype=np.float32), mask=None, 
+                            confidence=np.array([], dtype=np.float32), class_id=np.array([], dtype=np.int32), tracker_id=None)
+        try:
+            folder = os.path.dirname(self.session_root)
+            folderpath = folder + os.path.sep
+            new_folder = im_file.replace(folderpath, "")
+            ex_file =os.path.basename(new_folder)
+            new_file = os.path.join(folder,new_folder.replace(os.path.sep,"_out" + os.path.sep))
+            
+            if os.path.exists(new_file) and self.skip:
+                print(f"{new_file} exists")
+                result = {
+                    'img_id': im_file,
+                    'detections': det_null,
+                    'labels': 'animal',
+                    'object': 1,
+                    'eventStart': 0,
+                    'eventEnd': 0,
+                    'Make': None,
+                }
+            else:
+                if prev_result is not None:
+                    pre_detects = prev_result['detections']
+                else:
+                    pre_detects = None
+                result = pw_detect(im_file, new_file, self.threshold, pre_detects, self.diff_reasoning, self.verbose, self.model)
+            result['deploymentID'] = os.path.basename(self.session_root)
+            result['file'] = ex_file
+
+        except Exception as e:
+            print(f'Image {im_file} cannot be processed. Exception: {e}')
+            result = {
                 'img_id': im_file,
                 'detections': det_null,
-                'labels': 'animal',
-                'object': 1,
-                'eventStart': 0,
-                'eventEnd': 0,
-                'Make': None,
+                'file': os.path.basename(im_file),
+                'object': -1
             }
-        else:
-            results = pw_detect(im_file, new_file, threshold)
-        #result['deploymentID'] = os.path.basename(session_root)
-        #result['file'] = ex_file
-        return results
-    
-    except Exception as e:
-        print('Video {} cannot be processed. Exception: {}'.format(im_file, e))
-        results = {
-            'img_id': im_file,
-            'detections': det_null,
-            'file': os.path.basename(im_file),
-            'animal_ns': -1
-        }
-        return results
+        
+        return result
+        
+
+    def producer_func(self, q):
+        """
+        Producer function; only used when using the (optional) image queue.
+
+        Reads up to N images from disk and puts them on the blocking queue for processing.
+        """
+
+        if self.verbose:
+            print('Producer starting'); sys.stdout.flush()
+
+        for im_file in self.image_files:
+
+            try:
+                if self.verbose:
+                    print('Loading image {}'.format(im_file)); sys.stdout.flush()
+                #image = viz_utils.load_image(im_file)
+            except Exception as e:
+                print(f'Producer process: image {im_file} cannot be loaded. Exception: {e}')
+                #raise
+
+            if self.verbose:
+                print('Queueing image {}'.format(im_file)); sys.stdout.flush()
+            q.put(im_file)
+
+        q.put(None)
+
+        print('Finished image loading'); sys.stdout.flush()
 
 
-def producer_func(q,image_files):
-    """
-    Producer function; only used when using the (optional) image queue.
+    def consumer_func(self, q, return_queue):
+        """
+        Consumer function; only used when using the (optional) image queue.
 
-    Reads up to N images from disk and puts them on the blocking queue for processing.
-    """
+        Pulls images from a blocking queue and processes them.
+        """
 
-    if verbose:
-        print('Producer starting'); sys.stdout.flush()
+        if self.verbose:
+            print('Consumer starting'); sys.stdout.flush()
 
-    for im_file in image_files:
+        start_time = time.time()
+        results = []
+
+        n_images_processed = 0
+
+        while True:
+            im_file_q = q.get()
+            if im_file_q is None:
+                q.task_done()
+                self.save_detection_results(results, size=len(results), done=True)
+                return_queue.put(results)
+                return
+            n_images_processed += 1
+            if self.verbose or ((n_images_processed % 10) == 0):
+                time_diff = time.time() - start_time
+                images_per_second = n_images_processed / time_diff if time_diff > 0 else float('inf')
+                print(f'De-queued image {n_images_processed} ({images_per_second}/s)')
+                sys.stdout.flush()
+            if self.checkpoint is not None and self.checkpoint > 0 and ((n_images_processed % self.checkpoint) == 0):
+                    self.save_detection_results(results, size=n_images_processed, done=False)
+            prev_result = None if len(results) == 0 else results[-1]
+            result = self.process_image(im_file_q, prev_result)
+            results.append(result)
+            if self.verbose:
+                print('Processed image {}'.format(im_file_q)); sys.stdout.flush()
+            q.task_done()
+        
+        
+    def run_detector_with_image_queue(self):
 
         try:
-            if verbose:
-                print('Loading image {}'.format(im_file)); sys.stdout.flush()
-            #image = viz_utils.load_image(im_file)
-        except Exception as e:
-            print('Producer process: Video {} cannot be loaded. Exception: {}'.format(im_file, e))
-            #raise
+            q = multiprocessing.JoinableQueue(maxsize=10)
+            return_queue = multiprocessing.Queue(1)
 
-        if verbose:
-            print('Queueing image {}'.format(im_file)); sys.stdout.flush()
-        q.put([im_file])
+            producer = multiprocessing.Process(target=self.producer_func, args=(q,))
+            producer.daemon = False
+            producer.start()
+            print('Producer started')
 
-    q.put(None)
-
-    print('Finished image loading'); sys.stdout.flush()
-
-
-def consumer_func(q, return_queue, session_root=None, threshold=None, checkpoint=None):
-    """
-    Consumer function; only used when using the (optional) image queue.
-
-    Pulls images from a blocking queue and processes them.
-    """
-
-    if verbose:
-        print('Consumer starting'); sys.stdout.flush()
-
-    start_time = time.time()
-    print(start_time)
-    elapsed = time.time() - start_time
-    print('Loaded model (before queueing) in {}'.format(humanfriendly.format_timespan(elapsed)))
-    sys.stdout.flush()
-
-    results_list = []
-
-    n_images_processed = 0
-
-    while True:
-        r = q.get()
-        if r is None:
-            q.task_done()
-            save_detection_results(results_list, session_root, size = len(results_list), done=True)
-            return_queue.put(results_list)
-            return
-        n_images_processed += 1
-        im_file = r[0]
-        #image = r[1]
-        if verbose or ((n_images_processed % 10) == 0):
-            elapsed = time.time() - start_time
-            images_per_second = n_images_processed / elapsed
-            print('De-queued image {} ({}/s) ({})'.format(n_images_processed,images_per_second,im_file))
-            sys.stdout.flush()
-        if checkpoint is not None and checkpoint > 0 and ((n_images_processed % checkpoint) == 0):
-                 save_detection_results(results_list, session_root, size=n_images_processed, done=False)
-        result = process_image(im_file,session_root,threshold)
-        results_list.append(result)
-        if verbose:
-            print('Processed video {}'.format(im_file)); sys.stdout.flush()
-        q.task_done()
-    
-
-def run_detector_with_image_queue(image_files, threshold, session_root, checkpoint):
-    """
-    Driver function for the (optional) multiprocessing-based image queue; only used when --use_image_queue
-    is specified.  Starts a reader process to read images from disk, but processes images in the
-    process from which this function is called (i.e., does not currently spawn a separate consumer
-    process).
-    """
-    try:
-        q = multiprocessing.JoinableQueue(maxsize=max_queue_size)
-        return_queue = multiprocessing.Queue(1)
-
-        if use_threads_for_queue:
-            producer=Thread(target=producer_func,args=(q,image_files))
-            print('Using threads for queue')
-        else:
-            producer=Process(target=producer_func,args=(q,image_files))
-            print('Using processes for queue')
-        producer.daemon = False
-        producer.start()
-
-        # TODO
-        #
-        # The queue system is a little more elegant if we start one thread for reading and one
-        # for processing, and this works fine on Windows, but because we import TF at module load,
-        # CUDA will only work in the main process, so currently the consumer function runs here.
-        #
-        # To enable proper multi-GPU support, we may need to move the TF import to a separate module
-        # that isn't loaded until very close to where inference actually happens.
-        run_separate_consumer_process = False
-
-        if run_separate_consumer_process:
-            if use_threads_for_queue:
-                consumer = Thread(target=consumer_func,args=(q,return_queue, session_root, threshold, checkpoint))
-            else:
-                consumer = Process(target=consumer_func,args=(q,return_queue, session_root, threshold, checkpoint))
-            consumer.daemon = True
+            consumer = multiprocessing.Process(target=self.consumer_func, args=(q, return_queue))
+            consumer.daemon = False
             consumer.start()
-        else:
-            consumer_func(q, return_queue, session_root, threshold, checkpoint)
 
-        producer.join()
-        print('Producer finished')
+            producer.join()
+            print('Producer finished')
 
-        if run_separate_consumer_process:
-            consumer.join()
-            print('Consumer finished')
-        else:
-            print('Consumer ended')
-
-        q.join()
-        print('Queue joined')
+            q.join()
+            print('Queue joined')
+                
+            return
             
-        if not return_queue.empty():
-            results_list = return_queue.get()
-            print('Results returned from queue')
-            #last results print
-            print(results_list[-1])
-            return results_list
-        
-        else:
-            print('Warning: no results returned from queue')
-            return []
-        
-    except Exception as e:
-        print('Exception: {}'.format(e))
-        raise
-
-
-cli_conf = OmegaConf.from_cli()  # command line interface config
-
-session_root = cli_conf.get("session_root").rstrip("\\")
-
-threshold = cli_conf.get("threshold")
-
-checkpoint = cli_conf.get("checkpoint")
-
-parent_dir = os.path.dirname(session_root)
-create_new_structure(session_root, parent_dir)
-image_files = find_video_files(session_root)
-
-# Number of images to pre-fetch
-max_queue_size = 10
-use_threads_for_queue = True
-verbose = False
-
-if isinstance(checkpoint, str) and checkpoint[0] == "r":
-    checkpoint = len(image_files) // int(checkpoint[1:])
-print("checkpoint:",checkpoint)
-
-
-run_detector_with_image_queue(image_files, threshold, session_root, checkpoint)
+        except Exception as e:
+            print('Exception: {}'.format(e))
+            raise
