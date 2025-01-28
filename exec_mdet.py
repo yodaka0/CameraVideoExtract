@@ -50,7 +50,7 @@ class ExecMdet:
 
         # Convert results to DataFrame
         results_dataframe = pd.DataFrame(results)
-        results_dataframe_object = results_dataframe[max[results_dataframe['animal_ns']] > 0]
+        results_dataframe_object = results_dataframe[results_dataframe['object'] > 0]
 
         # Save results DataFrame to CSV
         results_dataframe_object.to_csv(output_csv_path, index=True)
