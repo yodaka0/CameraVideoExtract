@@ -15,8 +15,10 @@ import torch
 from PytorchWildlife.models import detection as pw_detection
 #from PytorchWildlife.data import transforms as pw_trans
 from PytorchWildlife import utils as pw_utils
+from hachoir.parser import createParser
+from hachoir.metadata import extractMetadata
 
-from classifier import Classifier
+#from classifier import Classifier
 
 def video_clip(im_file):
     cliped_frames_path = None
@@ -48,8 +50,22 @@ def video_clip(im_file):
         # Read the next frame
         success, image = vidcap.read()
         count += 1
+
+    parser = createParser(im_file)
+    if not parser:
+        print("Unable to parse file")
+        exifdata = None
     
-    return cliped_frames_path, count
+    else:
+        with parser:
+            metadata = extractMetadata(parser)
+            if not metadata:
+                print("Unable to extract metadata")
+            else:
+                exifdata = metadata.exportDictionary()
+
+    
+    return cliped_frames_path, count, exifdata
 
 
 def pw_detect(im_file, new_file, threshold=None, pre_detects=None, diff_reasoning=False, verbose=False, model=None, dir_remove=True):
@@ -78,10 +94,10 @@ def pw_detect(im_file, new_file, threshold=None, pre_detects=None, diff_reasonin
     else:
         detection_model = pw_detection.MegaDetectorV6(device=DEVICE, pretrained=True, version=model)
 
-    cliped_frames_path, count = video_clip(im_file)
+    cliped_frames_path, count, exif_data = video_clip(im_file)
 
 
-    new_file_path = os.path.dirname(new_file)
+    #new_file_path = os.path.dirname(new_file)
 
     # Performing the detection on the single image
     #result = detection_model.single_image_detection(transform(img), img.shape, im_file, conf_thres=threshold)
@@ -90,7 +106,11 @@ def pw_detect(im_file, new_file, threshold=None, pre_detects=None, diff_reasonin
         result = detection_model.single_image_detection(img=im_file)
         #print(result)
     else:
-        results = detection_model.batch_image_detection(cliped_frames_path, batch_size=count, det_conf_thres=threshold)
+        try:
+            results = detection_model.batch_image_detection(cliped_frames_path, batch_size=count, det_conf_thres=threshold)
+        except:
+            results = detection_model.batch_image_detection(cliped_frames_path, batch_size=count)
+            print("threshold set defalut value")
         print(im_file + " has " + str(len(results)) + " frames")
 
     
@@ -128,14 +148,13 @@ def pw_detect(im_file, new_file, threshold=None, pre_detects=None, diff_reasonin
             shutil.copy(im_file, new_file)
 
     result_first['animal_ns'] = animal_ns
+    result_first['object'] = max(animal_ns)
 
     #delete directory of cliped_frames_path
     if dir_remove:
         shutil.rmtree(cliped_frames_path)
 
     try:
-        img = Image.open(im_file)
-        exif_data = img._getexif()
         result['eventStart']  = exif_data[36867]
         result['eventEnd'] = exif_data[36867]
         result["Make"] = exif_data[271]
