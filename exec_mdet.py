@@ -60,7 +60,7 @@ class ExecMdet:
                 corrupt_csv_path = os.path.join(output_dir, f"{base_name}_corrupt.csv")
                 df_corrupt.to_csv(corrupt_csv_path, index=True)
 
-    def process_image(self, im_file, prev_result):
+    def process_image(self, im_file, video_sep):
         det_null = Detections(
             xyxy=np.empty((0, 4), dtype=np.float32),
             mask=None, 
@@ -91,8 +91,8 @@ class ExecMdet:
             else:
                 pre_detects = prev_result['detections'] if prev_result else None
                 result = pw_detect(
-                    im_file, new_file, self.threshold,
-                    pre_detects, self.diff_reasoning, self.verbose, self.model
+                    im_file, new_file, self.threshold, video_sep=video_sep, 
+                    self.verbose, self.model, dir_remove=1
                 )
                 result['deploymentID'] = os.path.basename(self.session_root)
                 result['file'] = ex_file
