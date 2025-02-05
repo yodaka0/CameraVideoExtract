@@ -41,7 +41,7 @@ def start_process():
     session_root = session_root_entry.get()
     threshold = float(threshold_entry.get())
     checkpoint = checkpoint_entry.get()
-    diff_reasoning = diff_reason_swich.get()
+    video_separaion = video_frams.get()
     skip = skip_swich.get()
     md_model = model_var.get()
     open_folder = True
@@ -55,7 +55,7 @@ def start_process():
     else:
         checkpoint = int(checkpoint)
 
-    print(f"Session Root:{session_root}, Threshold:{threshold}, Checkpoint:{checkpoint}, Differential reasoning:{diff_reasoning}, Exist skip:{skip}")
+    print(f"Session Root:{session_root}, Threshold:{threshold}, Checkpoint:{checkpoint}, Video separation interval::{video_separaion}, Exist skip:{skip}")
 
     
     #parent_dir = os.path.dirname(session_root)
@@ -63,7 +63,7 @@ def start_process():
     
     output_dir = session_root + "_out"
 
-    exec_mdet = ExecMdet(image_files, threshold, session_root, checkpoint, diff_reasoning, skip, md_model)
+    exec_mdet = ExecMdet(image_files, threshold, session_root, checkpoint, video_separaion, skip, md_model)
     exec_mdet.run_detector_with_image_queue()
     messagebox.showinfo("Info", f"Process completed successfully. Check the output folder {output_dir} for results.")
     root.destroy()
@@ -89,12 +89,11 @@ tk.Label(root, text="Checkpoint:").grid(row=2, column=0, padx=10, pady=5)
 checkpoint_entry = tk.Entry(root, width=50)
 checkpoint_entry.grid(row=2, column=1, padx=10, pady=5)
 
-tk.Label(root, text="Differential reasoning:").grid(row=3, column=0, padx=10, pady=5)
-diff_reason_swich = tk.BooleanVar(root)
-diff_reason_swich.set(False)
-#add checkbutton for differential reasoning
-diff_reason_checkbutton = tk.Checkbutton(root, variable=diff_reason_swich)
-diff_reason_checkbutton.grid(row=3, column=1, padx=10, pady=5)
+tk.Label(root, text="Video separation interval:").grid(row=3, column=0, padx=10, pady=5)
+video_frams = tk.Entry(root, width=50)
+video_frams.insert(0, "1")
+#set interval between frames
+video_frams.grid(row=3, column=1, padx=10, pady=5)
 
 tk.Label(root, text="Skip existing files:").grid(row=4, column=0, padx=10, pady=5)
 skip_swich = tk.BooleanVar(root)
